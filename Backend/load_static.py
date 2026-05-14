@@ -1,0 +1,1 @@
+'''Load the static GTFS data'''
