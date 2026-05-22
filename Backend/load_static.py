@@ -3,7 +3,6 @@ import io
 import csv
 import os
 from dotenv import load_dotenv
-from sqlalchemy import(text, create_engine)
 from sqlalchemy.orm import sessionmaker
 from zipfile import ZipFile
 from models import engine, Route, Stop, Trip
@@ -66,8 +65,7 @@ def load_static_GTFS(zip_path):
                     session.merge(trip)
                 session.commit()
                 print("Trips loaded")
-            
-        
+
     print("Static GTFS loaded!")
 
 
