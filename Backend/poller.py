@@ -203,7 +203,7 @@ def poll_trips_once(url):
             """), records)
             
             conn.commit()
-            print(f"inserted {len(records)} vehicle positions into database")
+            print(f"inserted {len(records)} delay observations into database")
     else:
         print("no valid records from poller")   
 
