@@ -207,6 +207,16 @@ def poll_trips_once(url):
     else:
         print("no valid records from poller")   
 
+def poll_weather_once(url):
+    '''
+    Poll OpenWeather data manually from url (assumes key is included) and sets data into engine (database)
+
+    Args:
+        url (str): url for polling
+    '''
+    pass
+    
+
 
 #Load URL's + keys
 load_dotenv()
@@ -218,7 +228,11 @@ GO_TRIP_UPDATE_URL = (
     "https://api.openmetrolinx.com/OpenDataAPI/api/V1/Gtfs/Feed/TripUpdates"
     f"?key={os.getenv('GO_API_KEY')}"
 )
-
+OPENWEATHER_URL = (
+    "https://api.openweathermap.org/data/2.5/weather?lat="
+    f"{43.63}&lon={-79.39}&appid={os.getenv('OPENWEATHER_API_KEY')}&units=metric"
+)
 if __name__ == "__main__":
-    poll_vehicle_once(GO_VEHICLE_URL)
-    poll_trips_once(GO_TRIP_UPDATE_URL)
+    #poll_vehicle_once(GO_VEHICLE_URL)
+    #poll_trips_once(GO_TRIP_UPDATE_URL)
+    poll_weather_once(OPENWEATHER_URL)

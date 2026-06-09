@@ -1,9 +1,9 @@
 #Import os, dotenv, and needed sqlalchemy 
 import os
 from dotenv import load_dotenv
-from sqlalchemy import (Integer, Column, Text, SmallInteger, TIMESTAMP, ForeignKey, UniqueConstraint, text, create_engine)
+from sqlalchemy import (Integer, String, Float,Column, Text, SmallInteger, TIMESTAMP, ForeignKey, UniqueConstraint, text, create_engine)
 from sqlalchemy.dialects.postgresql import DOUBLE_PRECISION, UUID
-from sqlalchemy.orm import DeclarativeBase, relationship
+from sqlalchemy.orm import declarative_base, relationship
 import sqlalchemy as sa
 
 '''Use SQLAlchemy to do the following:
@@ -12,8 +12,7 @@ import sqlalchemy as sa
 - Create Hyper Tables
 '''
 #Create Static Tables (stops, routes, trips, predictions, & alert_subscriptions)
-class Base(DeclarativeBase):
-    pass
+Base = declarative_base()
 
 class Stop(Base):
     __tablename__ = "stops"
@@ -67,52 +66,50 @@ class AlertSubscription(Base):
 
     route = relationship('Route')
 
+class VehiclePosition(Base):
+    __tablename__ = "vehicle_positions"
+
+    trip_id = Column(String, primary_key=True)
+    recorded_at = Column(TIMESTAMP(timezone=True), primary_key=True)
+    
+    id = Column(Integer) 
+    route_id = Column(String)
+    lat = Column(Float)
+    lon = Column(Float)
+    delay_s = Column(Integer)
+
+class DelayObservation(Base):
+    __tablename__ = "delay_observations"
+
+    id = Column(Integer)
+    trip_id = Column(String, primary_key=True)
+    stop_id = Column(String, primary_key=True)
+    route_id = Column(String)
+
+    delay_s = Column(Integer)
+
+    temp_c = Column(DOUBLE_PRECISION)
+    precip_mm = Column(DOUBLE_PRECISION, default=0.0)
+    visibility = Column(Integer)
+
+    observed_at = Column(TIMESTAMP(timezone=True), primary_key=True)
+   
 
 #Create hypertables (vehicle_position & delay observations)
 def init_hypertables(engine):
-    with engine.connect() as conn:
-        conn.execute(text("CREATE EXTENSION IF NOT EXISTS timescaleDB"))
-
+    
+    with engine.begin() as conn:
         conn.execute(text("""
-            CREATE TABLE IF NOT EXISTS vehicle_positions (
-                    id          BIGSERIAL,
-                    trip_id     TEXT NOT NULL, 
-                    route_id    TEXT,
-                    lat         DOUBLE PRECISION,
-                    lon         DOUBLE PRECISION,
-                    delay_s     INTEGER,
-                    recorded_at TIMESTAMPTZ NOT NULL, 
-                    UNIQUE (trip_id, recorded_at)             
-            )
+            SELECT create_hypertable('vehicle_positions', 'recorded_at', if_not_exists => TRUE);
         """))
-
         conn.execute(text("""
-                SELECT create_hypertable('vehicle_positions', 'recorded_at', if_not_exists => TRUE)
+            SELECT create_hypertable('delay_observations', 'observed_at', if_not_exists => TRUE);
         """))
-        
-        conn.execute(text("""
-            CREATE TABLE IF NOT EXISTS delay_observations (
-                    id          BIGSERIAL, 
-                    trip_id     TEXT,
-                    route_id    TEXT,
-                    stop_id     TEXT,
-                    delay_s     INTEGER,
-                    temp_c      DOUBLE PRECISION,
-                    precip_mm   DOUBLE PRECISION DEFAULT 0,
-                    observed_at TIMESTAMPTZ NOT NULL, 
-                    UNIQUE (trip_id, stop_id, observed_at)             
-            )
-        """))
-
-        conn.execute(text("""
-                SELECT create_hypertable('delay_observations', 'observed_at', if_not_exists => TRUE)
-        """))
-
-        conn.commit() #solitify changes
-
+    
 
 #set up engine
 load_dotenv()
+
 
 DATABASE_URL = os.getenv("DATABASE_URL")
 engine = create_engine(DATABASE_URL)
@@ -120,6 +117,9 @@ engine = create_engine(DATABASE_URL)
 #Run
 def init_db(engine):
 
+    with engine.begin() as conn:
+        conn.execute(text("CREATE EXTENSION IF NOT EXISTS timescaleDB;"))
+            
     Base.metadata.create_all(engine)
 
     init_hypertables(engine)    
