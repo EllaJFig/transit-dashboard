@@ -6,11 +6,13 @@ from fastapi import FastAPI
 from apscheduler.schedulers.asyncio import AsyncIOScheduler #AsyncIOScheduler works best for FastAPI (whole architecture need to be async though)
 from apscheduler.triggers.interval import IntervalTrigger
 import random
+from datetime import timezone, datetime
 from api.routes import router as routes_router
 
 #poller.py get poll functions
 from poller import poll_vehicle_once
-from poller import poll_trips_once
+from poller import poll_trips_once, poll_weather_once
+
 
 load_dotenv()
 GO_VEHICLE_URL = (
@@ -21,6 +23,10 @@ GO_TRIP_UPDATE_URL = (
     "https://api.openmetrolinx.com/OpenDataAPI/api/V1/Gtfs/Feed/TripUpdates"
     f"?key={os.getenv('GO_API_KEY')}"
 )
+OPENWEATHER_URL = (
+    "https://api.openweathermap.org/data/2.5/weather?lat="
+    f"{os.getenv('WEATHER_LAT')}&lon={os.getenv('WEATHER_LON')}&appid={os.getenv('OPENWEATHER_API_KEY')}&units=metric"
+)
 
 scheduler = AsyncIOScheduler()
 
@@ -30,6 +36,7 @@ async def lifespan(app: FastAPI):
     #set up poll_once job's; use interval triggers every 30 sec (+/- 3secs), set id, name, and replace_existing ==TRUE
     scheduler.add_job(poll_vehicle_once, trigger=IntervalTrigger(seconds=30 + random.randint(-3,3)), id="vehicle_poller", name="Poll Vehicle Positions", replace_existing=True,args=[GO_VEHICLE_URL])
     scheduler.add_job(poll_trips_once, trigger=IntervalTrigger(seconds=30 + random.randint(-3,3)), id="trip_poller", name="Poll Trip Updates", replace_existing=True,args=[GO_TRIP_UPDATE_URL])
+    scheduler.add_job(poll_weather_once, trigger=IntervalTrigger(hours=1), id="weather_poller", name="Poll Weather Observations", replace_existing=True, next_run_time=datetime.now(timezone.utc), args=[OPENWEATHER_URL]) 
     
     #start scheduler
     scheduler.start()

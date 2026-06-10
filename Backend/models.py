@@ -1,7 +1,7 @@
 #Import os, dotenv, and needed sqlalchemy 
 import os
 from dotenv import load_dotenv
-from sqlalchemy import (Integer, String, Float,Column, Text, SmallInteger, TIMESTAMP, ForeignKey, UniqueConstraint, text, create_engine)
+from sqlalchemy import (Integer, String, Float, Boolean, Column, Text, SmallInteger, TIMESTAMP, ForeignKey, UniqueConstraint, text, create_engine)
 from sqlalchemy.dialects.postgresql import DOUBLE_PRECISION, UUID
 from sqlalchemy.orm import declarative_base, relationship
 import sqlalchemy as sa
@@ -69,8 +69,8 @@ class AlertSubscription(Base):
 class VehiclePosition(Base):
     __tablename__ = "vehicle_positions"
 
-    trip_id = Column(String, primary_key=True)
-    recorded_at = Column(TIMESTAMP(timezone=True), primary_key=True)
+    trip_id = Column(String, primary_key=True, unique=True)
+    recorded_at = Column(TIMESTAMP(timezone=True), primary_key=True, unique=True)
     
     id = Column(Integer) 
     route_id = Column(String)
@@ -82,8 +82,8 @@ class DelayObservation(Base):
     __tablename__ = "delay_observations"
 
     id = Column(Integer)
-    trip_id = Column(String, primary_key=True)
-    stop_id = Column(String, primary_key=True)
+    trip_id = Column(String, primary_key=True, unique=True)
+    stop_id = Column(String, primary_key=True, unique=True)
     route_id = Column(String)
 
     delay_s = Column(Integer)
@@ -92,8 +92,23 @@ class DelayObservation(Base):
     precip_mm = Column(DOUBLE_PRECISION, default=0.0)
     visibility = Column(Integer)
 
-    observed_at = Column(TIMESTAMP(timezone=True), primary_key=True)
+    observed_at = Column(TIMESTAMP(timezone=True), primary_key=True, unique=True)
    
+class WeatherObservation(Base):
+    __tablename__ = "weather_observations"
+    id = Column(Integer)
+    observed_hour = Column(TIMESTAMP(timezone=True), nullable=False, unique=True, primary_key=True)
+
+    temp_c = Column(DOUBLE_PRECISION)
+    feels_like_c = Column(DOUBLE_PRECISION)
+    precip_1h_mm = Column(DOUBLE_PRECISION, default=0)
+    snow_1h_mm = Column(DOUBLE_PRECISION, default=0)
+    wind_kph = Column(DOUBLE_PRECISION)
+    visibility_km = Column(DOUBLE_PRECISION)
+
+    condition = Column(String)
+    is_precipitating = Column(Boolean, default=False)
+
 
 #Create hypertables (vehicle_position & delay observations)
 def init_hypertables(engine):
@@ -105,12 +120,13 @@ def init_hypertables(engine):
         conn.execute(text("""
             SELECT create_hypertable('delay_observations', 'observed_at', if_not_exists => TRUE);
         """))
+        conn.execute(text("""
+            SELECT create_hypertable('weather_observations', 'observed_hour', if_not_exists => TRUE);
+        """))
     
 
 #set up engine
 load_dotenv()
-
-
 DATABASE_URL = os.getenv("DATABASE_URL")
 engine = create_engine(DATABASE_URL)
 

@@ -34,7 +34,7 @@ def poll_vehicle_once(url):
             print("Entity array is empty.")
             return
 
-        print("Structure of the first record is:", transit_records[0].keys())
+        #print("Structure of the first record is:", transit_records[0].keys())
     except requests.exceptions.HTTPError as http_err:
         print(f"Transit API down or mad: {http_err}")
         return
@@ -132,7 +132,7 @@ def poll_trips_once(url):
             print("Entity array is empty.")
             return
 
-        print("Structure of the first record is:", transit_records[0].keys())
+        #print("Structure of the first record is:", transit_records[0].keys())
     except requests.exceptions.HTTPError as http_err:
         print(f"Transit API down or mad: {http_err}")
         return
@@ -209,14 +209,106 @@ def poll_trips_once(url):
 
 def poll_weather_once(url):
     '''
-    Poll OpenWeather data manually from url (assumes key is included) and sets data into engine (database)
+    Poll OpenWeather data manually from url (assumes key is included) and store it into database in weather_observations table
 
     Args:
         url (str): url for polling
     '''
-    pass
-    
+    try:
+        response = requests.get(url=url, timeout=10) #requests handles the url and timeout
+        response.raise_for_status()
+        
+        data = response.json() #OpenWeather API data 
 
+        
+    except requests.exceptions.HTTPError as http_err:
+        print(f"OpenWeather API down or mad: {http_err}")
+        return
+    except requests.exceptions.Timeout:
+        print("OpenWeather API Timeout")
+        return
+    except requests.exceptions.ConnectionError:
+        print("OpenWeather API connection failure")
+        return
+    
+    now = datetime.now(timezone.utc)
+    observed_hour = now.replace(minute=0, second=0, microsecond=0) #only grab the hour weather was observed at
+    
+    #headers
+    main = data.get('main', {})
+    wind = data.get('wind', {})
+    rain = data.get('rain', {}) #NOTE: rain and snow data will be absent if no rain or snow
+    snow = data.get('snow', {})
+    weather = data.get('weather', [{}])[0]
+
+    #body
+    temp_c = main.get('temp')
+    feels_like_c = main.get('feels_like')
+    precip_1h_mm = rain.get('1h',0.0)
+    snow_1h_mm = snow.get('1h', 0.0)
+    wind_kph = round(wind.get('speed',0) *3.6, 1) # convert mph to kmp
+
+    visibility_m = data.get('visibility', 10000) #visibility in meters; default 10000
+    visibility_km = round(min(visibility_m/1000, 10.0), 2) # visibility in km; cap at 10
+
+    """
+    OpenWeather id meaning:
+    801-804: Clouds
+    800: clear sky
+    700: fog, mist, dust
+    600: snow
+    500: rain
+    300: Drizzle
+    200: Thunderstorms
+    """
+    condition_id = int(weather.get('id', 800))
+    if 701 <= condition_id <= 781:
+        condition = "fog" #visibility issue; its a wide range
+    elif snow_1h_mm > 0.1 or (600 <= condition_id <= 622):
+         condition = "snow"
+    elif precip_1h_mm > 2.0 or (500 <= condition_id <= 531):
+        condition = "rain"
+    elif precip_1h_mm > 0 or (300 <= condition_id <= 321):
+        condition = "drizzle"
+    elif 200 <= condition_id <= 232:
+        condition = "thunderstorm"
+    else:
+        condition = "clear"
+
+    is_precipitating = condition in ('snow', 'drizzle', 'rain', 'thunderstorm')
+
+    record = {
+        "observed_hour": observed_hour,
+        "temp_c": temp_c,
+        "feels_like_c": feels_like_c,
+        "precip_1h_mm": precip_1h_mm,
+        "snow_1h_mm": snow_1h_mm,
+        "wind_kph": wind_kph,
+        "visibility_km": visibility_km,
+        "condition": condition,
+        "is_precipitating": is_precipitating,
+    }
+
+    if record:
+        with engine.connect() as conn:
+                conn.execute(text(""" 
+                INSERT INTO weather_observations (observed_hour, temp_c, feels_like_c, precip_1h_mm, snow_1h_mm, wind_kph, visibility_km, condition, is_precipitating)
+                VALUES (:observed_hour, :temp_c, :feels_like_c, :precip_1h_mm, :snow_1h_mm, :wind_kph, :visibility_km, :condition, :is_precipitating)
+                ON CONFLICT (observed_hour) DO UPDATE SET
+                    temp_c              = EXCLUDED.temp_c,   
+                    feels_like_c        = EXCLUDED.feels_like_c,   
+                    precip_1h_mm        = EXCLUDED.precip_1h_mm,   
+                    snow_1h_mm          = EXCLUDED.snow_1h_mm,
+                    wind_kph            = EXCLUDED.wind_kph,
+                    visibility_km       = EXCLUDED.visibility_km,
+                    condition           = EXCLUDED.condition,
+                    is_precipitating    = EXCLUDED.is_precipitating              
+                """), record)
+                
+                conn.commit()
+                print(f"Current Weather recorded as: {temp_c} C , {condition}, precip: {precip_1h_mm}mm, snow: {snow_1h_mm}mm, wind: {wind_kph}kph, visibility: {visibility_km}km")
+    else:
+        print("no valid records from poller")  
 
 #Load URL's + keys
 load_dotenv()
@@ -230,7 +322,7 @@ GO_TRIP_UPDATE_URL = (
 )
 OPENWEATHER_URL = (
     "https://api.openweathermap.org/data/2.5/weather?lat="
-    f"{43.63}&lon={-79.39}&appid={os.getenv('OPENWEATHER_API_KEY')}&units=metric"
+    f"{os.getenv('WEATHER_LAT')}&lon={os.getenv('WEATHER_LON')}&appid={os.getenv('OPENWEATHER_API_KEY')}&units=metric"
 )
 if __name__ == "__main__":
     #poll_vehicle_once(GO_VEHICLE_URL)
