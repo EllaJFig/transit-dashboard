@@ -4,8 +4,9 @@ import csv
 import os
 from dotenv import load_dotenv
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from zipfile import ZipFile
-from models import engine, Route, Stop, Trip
+from models import engine, Route, Stop, Trip, Shape
 
 load_dotenv()
 Session = sessionmaker(bind=engine)
@@ -53,20 +54,55 @@ def load_static_GTFS(zip_path):
                 print("Stops loaded")
 
             with f.open('trips.txt', 'r') as trips:
-                #read the trip_id, route_id, service_id, trip_headsign
+                #read the trip_id, route_id, service_id, trip_headsign, shape_id
                 reader = csv.DictReader(io.TextIOWrapper(trips, encoding='utf-8-sig'))
-                for r in reader:
-                    trip_id = r['trip_id']
-                    route_id = r.get('route_id', "")
-                    service_id = r.get('service_id', "")
-                    trip_headsign = r.get('trip_headsign', "") 
-
-                    trip = Trip(trip_id=trip_id, route_id=route_id, service_id= service_id, headsign=trip_headsign,)
-                    session.merge(trip)
+                rows = [
+                    {
+                        "trip_id":    r['trip_id'],
+                        "route_id":   r.get('route_id', ''),
+                        "service_id": r.get('service_id', ''),
+                        "headsign":   r.get('trip_headsign', ''),
+                        "shape_id":   r.get('shape_id', ''), 
+                    }
+                    for r in reader
+                ]
+                if rows:
+                    stmt = pg_insert(Trip).values(rows).on_conflict_do_update(
+                        index_elements=["trip_id"],
+                        set_={
+                            "route_id":   pg_insert(Trip).excluded.route_id,
+                            "service_id": pg_insert(Trip).excluded.service_id,
+                            "headsign":   pg_insert(Trip).excluded.headsign,
+                            "shape_id":   pg_insert(Trip).excluded.shape_id,
+                        }
+                    )
+                    session.execute(stmt)
                 session.commit()
-                print("Trips loaded")
+                print("Trips loaded with shape_id included")
 
-    print("Static GTFS loaded!")
+            with f.open('shapes.txt', 'r') as shapes_file:
+                reader = csv.DictReader(io.TextIOWrapper(shapes_file, encoding='utf-8-sig'))
+                rows = [
+                    {
+                        "shape_id":    r['shape_id'],
+                        "lat":         float(r['shape_pt_lat']),
+                        "lon":         float(r['shape_pt_lon']),
+                        "pt_sequence": int(r['shape_pt_sequence']),
+                    }
+                    for r in reader
+                ]
+
+                #bulk insert in chunks to avoid slow row by row insert
+                chunk_size = 1000
+                for i in range(0, len(rows), chunk_size):
+                    chunk = rows[i : i + chunk_size]
+                    stmt = pg_insert(Shape).values(chunk).on_conflict_do_nothing()
+                    session.execute(stmt)
+
+                session.commit()
+                print(f"Shapes loaded")
+
+    
 
 
 #Testing & Set up

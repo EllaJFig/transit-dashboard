@@ -36,6 +36,7 @@ class Trip(Base):
     route_id = Column(Text, ForeignKey('routes.route_id'))
     service_id = Column(Text)
     headsign = Column(Text)
+    shape_id   = Column(Text)
 
     route = relationship('Route', back_populates='trip')
 
@@ -66,6 +67,18 @@ class AlertSubscription(Base):
 
     route = relationship('Route')
 
+class Shape(Base):
+    __tablename__ = "shapes"
+    __tableargs__ = (
+        {"schema": None }
+    )
+    id            = Column(Integer, primary_key=True, autoincrement=True)
+    shape_id      = Column(Text, nullable=False, index=True)
+    lat           = Column(DOUBLE_PRECISION, nullable=False)
+    lon           = Column(DOUBLE_PRECISION, nullable=False)
+    pt_sequence   = Column(Integer, nullable=False)
+
+#Create hypertables
 class VehiclePosition(Base):
     __tablename__ = "vehicle_positions"
 
@@ -110,7 +123,6 @@ class WeatherObservation(Base):
     is_precipitating = Column(Boolean, default=False)
 
 
-#Create hypertables (vehicle_position & delay observations)
 def init_hypertables(engine):
     
     with engine.begin() as conn:
