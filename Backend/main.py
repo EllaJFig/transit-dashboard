@@ -7,7 +7,10 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler #AsyncIOScheduler wo
 from apscheduler.triggers.interval import IntervalTrigger
 import random
 from datetime import timezone, datetime
+
 from api.routes import router as routes_router
+from api.vehicles import router as vehicle_router
+from api.predictions import router as prediction_router
 
 #poller.py get poll functions
 from poller import poll_vehicle_once
@@ -49,8 +52,11 @@ async def lifespan(app: FastAPI):
     print("Poller Stopped")
 
 
+#initalize endpoints
 app = FastAPI(title="Transit Dashboard API",version="0.1.0", lifespan=lifespan)
 app.include_router(routes_router)
+app.include_router(vehicle_router)
+app.include_router(prediction_router)
 
 #set up health check
 @app.get("/health")
