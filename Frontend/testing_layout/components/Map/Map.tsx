@@ -25,7 +25,6 @@ function formatDelay(s:number| null){
     if (s <= 0) return "on time";
     const m = Math.floor(s/60), sec = s%60;
     return m > 0 ? `${m}m ${sec}s late` : `${sec}s late`;
-
 }
 
 
@@ -39,13 +38,15 @@ export default function Map() {
             try {
                 const res = await fetch("http://localhost:8000/api/v1/vehicles/live");
                 const data = await res.json();
+                console.log("Raw API Data:", data);
                 
                 const seen = new globalThis.Map<string, Vehicle>();
                 data.forEach((v:Vehicle) => seen.set(v.trip_id, v));
 
                 setVehicles(Array.from(seen.values()));
                 setUpdated(new Date().toLocaleTimeString());
-            } catch {/*server not ready */}
+            } catch (error){
+                console.error("Fetch failed with error: ", error)}
         };
         load();
         const id = setInterval(load,30_000);
@@ -78,7 +79,7 @@ export default function Map() {
                 <span style={{fontWeight: 600, fontSize: 16}}>GO Transit </span>
                 <span style={{ fontSize:12, color: "#64748b"}} >
                     {vehicles.length} vehicles
-                    {updated && '. ${updated}'}
+                    {updated && `. ${updated}`}
                 </span>
             </div>
 
@@ -137,11 +138,11 @@ export default function Map() {
                 color: "#94a3b8",
                 flexShrink: 0,
             }}>
-                {[["#22c55e", "On time"], ["#f59e0b", "< 5 mins late"], ["#f13131", ">5 mins late"], ["#64748b", "Unknown"],
+                {[["#22c55e", "On time"], ["#f59e0b", "< 5 mins late"], ["#f13131", "> 5 mins late"], ["#64748b", "Unknown"],
                 ].map(([c,l]) => (
-                    <div key={1} style={{display:"flex", alignItems:"center", gap: 6}}>
-                        <div style = {{width: 8, height: 8, borderRadius: "%50", background:c}} />
-                        {1}
+                    <div key={l} style={{display:"flex", alignItems:"center", gap: 6}}>
+                        <div style = {{width: 8, height: 8, borderRadius: "50%", background:c}} />
+                        {l}
                     </div>
                 ))}
                 <span style={ {marginLeft: "auto"}}> Click a vehicle to see its route</span>

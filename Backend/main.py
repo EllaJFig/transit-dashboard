@@ -2,9 +2,13 @@
 import os
 from dotenv import load_dotenv
 from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+
 from apscheduler.schedulers.asyncio import AsyncIOScheduler #AsyncIOScheduler works best for FastAPI (whole architecture need to be async though)
 from apscheduler.triggers.interval import IntervalTrigger
+
 import random
 from datetime import timezone, datetime
 
@@ -54,6 +58,21 @@ async def lifespan(app: FastAPI):
 
 #initalize endpoints
 app = FastAPI(title="Transit Dashboard API",version="0.1.0", lifespan=lifespan)
+
+#ports that are allowed to call eachother
+origins = [
+    f"{os.getenv('ORIGIN1')}",  
+    f"{os.getenv('ORIGIN2')}",
+]
+
+app.add_middleware(
+    CORSMiddleware, 
+    allow_origins=origins, 
+    allow_credentials=True, 
+    allow_methods=["*"], 
+    allow_headers=["*"],
+)
+
 app.include_router(routes_router)
 app.include_router(vehicle_router)
 app.include_router(prediction_router)
