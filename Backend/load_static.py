@@ -11,6 +11,10 @@ from models import engine, Route, Stop, Trip, Shape
 load_dotenv()
 Session = sessionmaker(bind=engine)
 
+"""
+NOTE: an automatic loader should be added; time schedule ones a week; to make sure the id's match up to current route info
+"""
+
 def load_static_GTFS(zip_path):
     '''
     Load static GTFS Go data from files named routes.txt, stops.txt, & trips.txt into the database using SQLalchemy

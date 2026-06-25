@@ -53,16 +53,21 @@ export default function Map() {
         return () => clearInterval(id);
     }, []);
 
-    const onVehicleClick = async (routeId: string) =>{
+    const onVehicleClick = async (tripId: string) =>{
         try{
-            const res = await fetch(`http://localhost:8000/api/v1/routes/${routeId}/shape`);
+            const res = await fetch(`http://localhost:8000/api/v1/trips/${tripId}/shape`);
             const data = await res.json();
-            if (data.shapes?.[0]?.points) {
-                setShape(data.shapes[0].points.map( (p:any) => [p.lat, p.lon]));
+            if (data.points && data.points.length > 0) {
+                setShape(data.points.map( (p:any) => [p.lat, p.lon]));
+            }else {
+                setShape([]);
             }
-        } catch {/*ignore*/}
+        } catch (err) {
+            console.error("Failed to fetch shape:", err)
+        }
     };
     
+
     return (
         <div style={{display:"flex", flexDirection:"column", height:"100vh"}}> 
             
@@ -112,7 +117,7 @@ export default function Map() {
                                 color: "#111318",
                                 weight: 1.5,
                             }}
-                            eventHandlers={{click: () => onVehicleClick(v.route_id) }}
+                            eventHandlers={{click: () => onVehicleClick(v.trip_id) }}
                         >
                             <Popup>
                                 <div style={{fontSize: 13, lineHeight: 1.6}}>
@@ -138,7 +143,7 @@ export default function Map() {
                 color: "#94a3b8",
                 flexShrink: 0,
             }}>
-                {[["#22c55e", "On time"], ["#f59e0b", "< 5 mins late"], ["#f13131", "> 5 mins late"], ["#64748b", "Unknown"],
+                {[["#22c55e", "On time"], ["#f59e0b", "< 5 mins late"], ["#cd0e0e", "> 5 mins late"], ["#64748b", "Unknown"],
                 ].map(([c,l]) => (
                     <div key={l} style={{display:"flex", alignItems:"center", gap: 6}}>
                         <div style = {{width: 8, height: 8, borderRadius: "50%", background:c}} />
