@@ -141,6 +141,7 @@ def init_hypertables(engine):
 load_dotenv()
 
 DATABASE_URL = os.getenv("DATABASE_URL")
+
 if not DATABASE_URL:
     raise RuntimeError(
         "DATABASE_URL environment variable is not set. "
@@ -150,6 +151,7 @@ if not DATABASE_URL:
 # Fix Railway's postgres:// prefix
 if DATABASE_URL.startswith("postgres://"):
     DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+
 
 engine = create_engine(DATABASE_URL)
 
