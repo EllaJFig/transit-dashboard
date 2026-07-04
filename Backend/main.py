@@ -11,6 +11,7 @@ from apscheduler.triggers.interval import IntervalTrigger
 
 import random
 from datetime import timezone, datetime
+from sqlalchemy import text, create_engine
 
 from api.routes import router as routes_router
 from api.vehicles import router as vehicle_router
@@ -19,7 +20,6 @@ from api.predictions import router as prediction_router
 #poller.py get poll functions
 from poller import poll_vehicle_once
 from poller import poll_trips_once, poll_weather_once
-
 
 load_dotenv()
 GO_VEHICLE_URL = (
@@ -35,6 +35,28 @@ OPENWEATHER_URL = (
     f"{os.getenv('WEATHER_LAT')}&lon={os.getenv('WEATHER_LON')}&appid={os.getenv('OPENWEATHER_API_KEY')}&units=metric"
 )
 
+# ________Remove data older than 90 days________
+load_dotenv()
+DATABASE_URL = os.getenv("DATABASE_URL")
+engine = create_engine(DATABASE_URL)
+def clean_data():
+    """Remove data that is older than 90 days"""
+
+    with engine.connect() as conn:
+        conn.execute(text("""
+            DELETE FROM vehicle_positions 
+            WHERE recorded_at < NOW() - INTERVAL '90 days'
+         """))
+        conn.execute(text("""
+            DELETE FROM delay_observations 
+            WHERE observed_at < NOW() - INTERVAL '90 days'
+         """))
+        conn.commit()
+
+    print("old data is cleaned up!")
+
+
+# ________Set Up Scheduler________
 scheduler = AsyncIOScheduler()
 
 @asynccontextmanager
@@ -44,7 +66,8 @@ async def lifespan(app: FastAPI):
     scheduler.add_job(poll_vehicle_once, trigger=IntervalTrigger(seconds=30 + random.randint(-3,3)), id="vehicle_poller", name="Poll Vehicle Positions", replace_existing=True,args=[GO_VEHICLE_URL])
     scheduler.add_job(poll_trips_once, trigger=IntervalTrigger(seconds=30 + random.randint(-3,3)), id="trip_poller", name="Poll Trip Updates", replace_existing=True,args=[GO_TRIP_UPDATE_URL])
     scheduler.add_job(poll_weather_once, trigger=IntervalTrigger(hours=1), id="weather_poller", name="Poll Weather Observations", replace_existing=True, next_run_time=datetime.now(timezone.utc), args=[OPENWEATHER_URL]) 
-    
+    scheduler.add_job(clean_data,trigger=IntervalTrigger(hours=24), id='cleanup', name="Clean up old data", replace_existing=True)
+
     #start scheduler
     scheduler.start()
     print("Poller Started")
@@ -56,7 +79,7 @@ async def lifespan(app: FastAPI):
     print("Poller Stopped")
 
 
-#initalize endpoints
+#_____initalize endpoints_____
 app = FastAPI(title="Transit Dashboard API",version="0.1.0", lifespan=lifespan)
 
 #ports that are allowed to call eachother
@@ -64,7 +87,6 @@ origins = [
     f"{os.getenv('ORIGIN1')}",  
     f"{os.getenv('ORIGIN2')}",
 ]
-
 app.add_middleware(
     CORSMiddleware, 
     allow_origins=origins, 
@@ -76,6 +98,7 @@ app.add_middleware(
 app.include_router(routes_router)
 app.include_router(vehicle_router)
 app.include_router(prediction_router)
+
 
 #set up health check
 @app.get("/health")
