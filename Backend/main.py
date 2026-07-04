@@ -4,6 +4,12 @@ import os
 
 #for railway configuration
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+print("=== DEBUG ===")
+print("CWD:", os.getcwd())
+print("Files:", os.listdir("."))
+print("Has api folder:", os.path.exists("api"))
+print("Sys path:", sys.path[:3])
+print("=============")
 
 from dotenv import load_dotenv
 from contextlib import asynccontextmanager
