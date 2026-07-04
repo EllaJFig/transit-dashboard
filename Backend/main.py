@@ -1,5 +1,10 @@
 '''APScheduler will run every 30 secs in the backround and FastAPI will be used as the API endpoint'''
+import sys
 import os
+
+#for railway configuration
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
 from dotenv import load_dotenv
 from contextlib import asynccontextmanager
 
