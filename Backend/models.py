@@ -79,66 +79,69 @@ class Shape(Base):
     pt_sequence   = Column(Integer, nullable=False)
 
 #Create hypertables
-class VehiclePosition(Base):
-    __tablename__ = "vehicle_positions"
-
-    trip_id = Column(String, primary_key=True, unique=True)
-    recorded_at = Column(TIMESTAMP(timezone=True), primary_key=True, unique=True)
-    
-    id = Column(Integer) 
-    route_id = Column(String)
-    lat = Column(Float)
-    lon = Column(Float)
-    delay_s = Column(Integer)
-
-class DelayObservation(Base):
-    __tablename__ = "delay_observations"
-
-    id = Column(Integer)
-    trip_id = Column(String, primary_key=True, unique=True)
-    stop_id = Column(String, primary_key=True, unique=True)
-    route_id = Column(String)
-
-    delay_s = Column(Integer)
-
-    temp_c = Column(DOUBLE_PRECISION)
-    precip_mm = Column(DOUBLE_PRECISION, default=0.0)
-    visibility = Column(Integer)
-
-    observed_at = Column(TIMESTAMP(timezone=True), primary_key=True, unique=True)
-   
-class WeatherObservation(Base):
-    __tablename__ = "weather_observations"
-    id = Column(Integer)
-    observed_hour = Column(TIMESTAMP(timezone=True), nullable=False, unique=True, primary_key=True)
-
-    temp_c = Column(DOUBLE_PRECISION)
-    feels_like_c = Column(DOUBLE_PRECISION)
-    precip_1h_mm = Column(DOUBLE_PRECISION, default=0)
-    snow_1h_mm = Column(DOUBLE_PRECISION, default=0)
-    wind_kph = Column(DOUBLE_PRECISION)
-    visibility_km = Column(DOUBLE_PRECISION)
-
-    condition = Column(String)
-    is_precipitating = Column(Boolean, default=False)
-
-
 def init_hypertables(engine):
-    
     with engine.begin() as conn:
+        conn.execute(text("CREATE EXTENSION IF NOT EXISTS timescaledb"))
+
         conn.execute(text("""
-            SELECT create_hypertable('vehicle_positions', 'recorded_at', if_not_exists => TRUE);
+            CREATE TABLE IF NOT EXISTS vehicle_positions (
+                id            BIGSERIAL,
+                trip_id       TEXT NOT NULL,
+                route_id      TEXT,
+                lat           DOUBLE PRECISION,
+                lon           DOUBLE PRECISION,
+                delay_seconds INT,
+                recorded_at   TIMESTAMPTZ NOT NULL,
+                UNIQUE (trip_id, recorded_at)
+            )
         """))
         conn.execute(text("""
-            SELECT create_hypertable('delay_observations', 'observed_at', if_not_exists => TRUE);
+            SELECT create_hypertable('vehicle_positions', 'recorded_at',
+                if_not_exists => TRUE)
+        """))
+
+        conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS delay_observations (
+                id            BIGSERIAL,
+                trip_id       TEXT,
+                route_id      TEXT,
+                stop_id       TEXT,
+                delay_seconds INT,
+                precip_mm     DOUBLE PRECISION DEFAULT 0,
+                temp_c        DOUBLE PRECISION,
+                observed_at   TIMESTAMPTZ NOT NULL,
+                UNIQUE (trip_id, stop_id, observed_at)
+            )
         """))
         conn.execute(text("""
-            SELECT create_hypertable('weather_observations', 'observed_hour', if_not_exists => TRUE);
+            SELECT create_hypertable('delay_observations', 'observed_at',
+                if_not_exists => TRUE)
         """))
-    
+
+        conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS weather_observations (
+                id               BIGSERIAL,
+                observed_hour    TIMESTAMPTZ NOT NULL,
+                temp_c           DOUBLE PRECISION,
+                feels_like_c     DOUBLE PRECISION,
+                precip_1h_mm     DOUBLE PRECISION DEFAULT 0,
+                snow_1h_mm       DOUBLE PRECISION DEFAULT 0,
+                wind_kph         DOUBLE PRECISION,
+                visibility_km    DOUBLE PRECISION,
+                condition        TEXT,
+                is_precipitating BOOLEAN DEFAULT FALSE,
+                UNIQUE (observed_hour)
+            )
+        """))
+        conn.execute(text("""
+            SELECT create_hypertable('weather_observations', 'observed_hour',
+                if_not_exists => TRUE)
+        """))
 
 #set up engine
-load_dotenv()
+load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), '..', '.env'), override=False)
+#test its reading right file
+print("DATABASE_URL starts with:", os.getenv("DATABASE_URL", "NOT SET")[:30]) 
 
 DATABASE_URL = os.getenv("DATABASE_URL")
 
@@ -154,6 +157,7 @@ if DATABASE_URL.startswith("postgres://"):
 
 
 engine = create_engine(DATABASE_URL)
+print("Engine URL:", engine.url)
 
 #Run
 def init_db(engine):

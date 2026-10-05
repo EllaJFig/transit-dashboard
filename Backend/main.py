@@ -32,7 +32,7 @@ from api.predictions import router as prediction_router
 from poller import poll_vehicle_once
 from poller import poll_trips_once, poll_weather_once
 
-load_dotenv()
+load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), '..', '.env'), override=False)
 GO_VEHICLE_URL = (
     "https://api.openmetrolinx.com/OpenDataAPI/api/V1/Gtfs/Feed/VehiclePosition"
     f"?key={os.getenv('GO_API_KEY')}"
@@ -47,7 +47,7 @@ OPENWEATHER_URL = (
 )
 
 # ________Remove data older than 90 days________
-load_dotenv()
+load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), '..', '.env'), override=False)
 DATABASE_URL = os.getenv("DATABASE_URL")
 engine = create_engine(DATABASE_URL)
 def clean_data():

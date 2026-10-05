@@ -8,7 +8,7 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from zipfile import ZipFile
 from models import engine, Route, Stop, Trip, Shape
 
-load_dotenv()
+load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), '..', '.env'), override=False)
 Session = sessionmaker(bind=engine)
 
 """
@@ -97,7 +97,7 @@ def load_static_GTFS(zip_path):
                 ]
 
                 #bulk insert in chunks to avoid slow row by row insert
-                chunk_size = 1000
+                chunk_size = 200
                 for i in range(0, len(rows), chunk_size):
                     chunk = rows[i : i + chunk_size]
                     stmt = pg_insert(Shape).values(chunk).on_conflict_do_nothing()

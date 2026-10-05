@@ -311,7 +311,7 @@ def poll_weather_once(url):
         print("no valid records from poller")  
 
 #Load URL's + keys
-load_dotenv()
+load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), '..', '.env'), override=False)
 GO_VEHICLE_URL = (
     "https://api.openmetrolinx.com/OpenDataAPI/api/V1/Gtfs/Feed/VehiclePosition"
     f"?key={os.getenv('GO_API_KEY')}"
