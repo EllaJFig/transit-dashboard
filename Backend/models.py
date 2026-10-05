@@ -145,17 +145,6 @@ print("DATABASE_URL starts with:", os.getenv("DATABASE_URL", "NOT SET")[:30])
 
 DATABASE_URL = os.getenv("DATABASE_URL")
 
-if not DATABASE_URL:
-    raise RuntimeError(
-        "DATABASE_URL environment variable is not set. "
-        "Add a PostgreSQL service in Railway or set the variable manually."
-    )
-
-# Fix Railway's postgres:// prefix
-if DATABASE_URL.startswith("postgres://"):
-    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
-
-
 engine = create_engine(DATABASE_URL)
 print("Engine URL:", engine.url)
 
